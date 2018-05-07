@@ -11,13 +11,12 @@ import org.antlr.v4.runtime.tree.ParseTreeWalker;
 
 import java.io.*;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 
 public class Compiler {
 	private CompilationOptions options;
 	private List<Module_declarationContext> modules;
-	private HashMap<String, LPN> nets;
+	private LPN lpn;
 
 	/**
 	 * Constructor for the Compiler class
@@ -26,8 +25,8 @@ public class Compiler {
 	public Compiler(CompilationOptions options) {
 		this.modules = new ArrayList<>();
 		this.options = options;
-		this.nets = new HashMap<>();
-		
+		this.lpn = new LPN();
+
 		for(File file : options.getFiles()) {
 			parseFile(file);
 		}
@@ -51,8 +50,10 @@ public class Compiler {
 			
 			Source_textContext source = parser.source_text();
 
-			VerilogListener vl = new VerilogListener(this.nets);
+			VerilogListener vl = new VerilogListener(this.lpn);
             ParseTreeWalker.DEFAULT.walk(vl, source);
+
+            this.lpn.save("result.lpn");
 
 			inputStream.close();
 		} catch (IOException e) {
