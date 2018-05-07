@@ -12,7 +12,6 @@ public class CompilationOptions {
 		
 		for(String argument : cmdline) {
 			// For now, assume all arguments are files
-			System.out.println(argument);
 			File fileArgument = new File(argument);
 			addFile(fileArgument);
 		}
