@@ -223,7 +223,6 @@ public class VerilogListener extends Verilog2001BaseListener {
 
         if(!this.didElse.pop()) {
             String conditionalExpression = "~(" + this.conditionalExpressions.pop() + ")";
-            System.err.println("Doing undone else with condition " + conditionalExpression);
             String transitionName = "else_" + ctx.start.getLine();
 
             this.current.addTransition(transitionName);
@@ -236,7 +235,6 @@ public class VerilogListener extends Verilog2001BaseListener {
         }
 
         this.current.last.clear();
-        System.err.println("Adding post: " + post);
         this.current.last.add(post);
     }
 
