@@ -12,6 +12,7 @@ public class VerilogListener extends Verilog2001BaseListener {
     private Stack<String> conditionalExpressions;
     private Stack<String> conditionalPost;
     private Stack<HashSet<String>> oldPrevious;
+    private Stack<Boolean> didElse;
     WrappedLPN current;
     boolean inAlways;
     boolean parsingExpression;
@@ -24,6 +25,7 @@ public class VerilogListener extends Verilog2001BaseListener {
         this.conditionalPost = new Stack<>();
         this.conditionalExpressions = new Stack<>();
         this.oldPrevious = new Stack<>();
+        this.didElse = new Stack<>();
     }
 
     private String getExpression() {
@@ -90,7 +92,7 @@ public class VerilogListener extends Verilog2001BaseListener {
         String transitionName = "wait_" + ctx.start.getLine();
         String postPlaceName = this.current.nextPlaceName();
 
-        this.current.lpn.addTransition(transitionName);
+        this.current.addTransition(transitionName);
         this.current.lpn.addPlace(postPlaceName, false);
         this.current.lpn.addMovement(transitionName, postPlaceName);
 
@@ -125,7 +127,7 @@ public class VerilogListener extends Verilog2001BaseListener {
 
         for(int i = 0; i < branches; i++) {
             String transitionName = this.current.nextTransitionName();
-            this.current.lpn.addTransition(transitionName);
+            this.current.addTransition(transitionName);
             this.current.lpn.addIntAssign(transitionName, lvalue, Integer.toString(i));
 
             for(String prev : this.current.last) {
@@ -161,7 +163,7 @@ public class VerilogListener extends Verilog2001BaseListener {
         String postPlaceName = this.current.nextPlaceName();
         String lvalue = ctx.variable_lvalue().hierarchical_variable_identifier().hierarchical_identifier().getText();
 
-        this.current.lpn.addTransition(transitionName);
+        this.current.addTransition(transitionName);
         this.current.lpn.addPlace(postPlaceName, false);
         this.current.lpn.addMovement(transitionName, postPlaceName);
 
@@ -193,7 +195,7 @@ public class VerilogListener extends Verilog2001BaseListener {
         String postPlaceName = this.current.nextPlaceName();
         String lvalue = ctx.variable_lvalue().hierarchical_variable_identifier().hierarchical_identifier().getText();
 
-        this.current.lpn.addTransition(transitionName);
+        this.current.addTransition(transitionName);
         this.current.lpn.addPlace(postPlaceName, false);
         this.current.lpn.addMovement(transitionName, postPlaceName);
 
@@ -218,7 +220,23 @@ public class VerilogListener extends Verilog2001BaseListener {
     @Override
     public void exitConditional_statement(Conditional_statementContext ctx) {
         String post = this.conditionalPost.pop();
+
+        if(!this.didElse.pop()) {
+            String conditionalExpression = "~(" + this.conditionalExpressions.pop() + ")";
+            System.err.println("Doing undone else with condition " + conditionalExpression);
+            String transitionName = "else_" + ctx.start.getLine();
+
+            this.current.addTransition(transitionName);
+            this.current.lpn.addMovement(transitionName, post);
+            this.current.lpn.addEnabling(transitionName, conditionalExpression);
+
+            for (String prev : this.current.last) {
+                this.current.lpn.addMovement(prev, transitionName);
+            }
+        }
+
         this.current.last.clear();
+        System.err.println("Adding post: " + post);
         this.current.last.add(post);
     }
 
@@ -236,6 +254,7 @@ public class VerilogListener extends Verilog2001BaseListener {
 
         if(this.parsingExpression) {
             this.parsingExpression = false;
+            this.didElse.push(false);
             // Handle if case
             conditionalExpression = getExpression();
             placeName = this.current.nextPlaceName();
@@ -245,13 +264,15 @@ public class VerilogListener extends Verilog2001BaseListener {
             this.oldPrevious.push(new HashSet<>(this.current.last));
         } else {
             // Handle else case
+            this.didElse.pop();
+            this.didElse.push(true);
             conditionalExpression = "~(" + this.conditionalExpressions.pop() + ")";
             placeName = this.current.nextPlaceName();
             transitionName = "else_" + ctx.start.getLine();
             this.oldPrevious.push(new HashSet<>(this.current.last));
         }
 
-        this.current.lpn.addTransition(transitionName);
+        this.current.addTransition(transitionName);
         this.current.lpn.addPlace(placeName, false);
         this.current.lpn.addMovement(transitionName, placeName);
         this.current.lpn.addEnabling(transitionName, conditionalExpression);
@@ -274,7 +295,7 @@ public class VerilogListener extends Verilog2001BaseListener {
 
         String transitionName = this.current.nextTransitionName();
 
-        this.current.lpn.addTransition(transitionName);
+        this.current.addTransition(transitionName);
 
         for(String place : this.current.last) {
             this.current.lpn.addMovement(place, transitionName);
@@ -354,11 +375,18 @@ public class VerilogListener extends Verilog2001BaseListener {
                     String prev = this.currentExpression.pop();
                     this.currentExpression.push("~" + prev);
                 }
+            } else if(!this.currentExpression.isEmpty() && this.currentExpression.peek().equals("!=")) {
+                this.currentExpression.pop();
+
+                if (number == 1) {
+                    String prev = this.currentExpression.pop();
+                    this.currentExpression.push("~" + prev);
+                }
             } else {
                 if(number == 0) {
-                    this.currentExpression.push("FALSE");
+                    this.currentExpression.push("false");
                 } else if(number == 1) {
-                    this.currentExpression.push("TRUE");
+                    this.currentExpression.push("true");
                 } else {
                     this.currentExpression.push(Integer.toString(number));
                 }
