@@ -21,6 +21,11 @@ public class WrappedLPN {
         this.last = new HashSet<>();
     }
 
+    public void addTransition(String name) {
+        this.lpn.addTransition(name);
+        this.lpn.changeDelay(name, "uniform(0,5)");
+    }
+
     public String nextPlaceName() {
         String nextPlaceName = "P" + Integer.toString(nextPlace);
         nextPlace++;

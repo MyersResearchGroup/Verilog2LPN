@@ -21,6 +21,9 @@ public class VerilogListener extends Verilog2001BaseListener {
         this.inAlways = false;
         this.parsingExpression = false;
         this.currentExpression = new Stack<>();
+        this.conditionalPost = new Stack<>();
+        this.conditionalExpressions = new Stack<>();
+        this.oldPrevious = new Stack<>();
     }
 
     private String getExpression() {
@@ -140,6 +143,38 @@ public class VerilogListener extends Verilog2001BaseListener {
     }
 
     @Override
+    public void enterVariable_assignment(Variable_assignmentContext ctx) {
+        if(!this.inAlways)
+            return;
+
+        this.parsingExpression = true;
+    }
+
+    @Override
+    public void exitVariable_assignment(Variable_assignmentContext ctx) {
+        if(!this.inAlways && !this.parsingExpression)
+            return;
+
+        this.parsingExpression = false;
+
+        String transitionName = "assign_" + ctx.start.getLine();
+        String postPlaceName = this.current.nextPlaceName();
+        String lvalue = ctx.variable_lvalue().hierarchical_variable_identifier().hierarchical_identifier().getText();
+
+        this.current.lpn.addTransition(transitionName);
+        this.current.lpn.addPlace(postPlaceName, false);
+        this.current.lpn.addMovement(transitionName, postPlaceName);
+
+        for(String prePlace : this.current.last) {
+            this.current.lpn.addMovement(prePlace, transitionName);
+        }
+
+        this.current.last.clear();
+        this.current.last.add(postPlaceName);
+        this.current.lpn.addBoolAssign(transitionName, lvalue, getExpression());
+    }
+
+    @Override
     public void enterBlocking_assignment(Blocking_assignmentContext ctx) {
         if(!this.inAlways)
             return;
@@ -175,40 +210,78 @@ public class VerilogListener extends Verilog2001BaseListener {
     public void enterConditional_statement(Conditional_statementContext ctx) {
         this.parsingExpression = true;
 
-        String endPlaceName = 
-
-        this.conditionalPost.push()
+        String endPlaceName = this.current.nextPlaceName();
+        this.current.lpn.addPlace(endPlaceName, false);
+        this.conditionalPost.push(endPlaceName);
     }
 
     @Override
     public void exitConditional_statement(Conditional_statementContext ctx) {
-        this.currentExpression.pop();
-        this.current.last = this.oldPrevious.pop();
+        String post = this.conditionalPost.pop();
+        this.current.last.clear();
+        this.current.last.add(post);
     }
 
     @Override
     public void enterStatement_or_null(Statement_or_nullContext ctx) {
+        if(this.conditionalPost.empty())
+            return;
+
+        if(!(ctx.getParent() instanceof Conditional_statementContext))
+            return;
+
+        String transitionName;
+        String placeName;
+        String conditionalExpression;
+
         if(this.parsingExpression) {
             this.parsingExpression = false;
             // Handle if case
-            this.conditionalExpressions.push(getExpression());
+            conditionalExpression = getExpression();
+            placeName = this.current.nextPlaceName();
+            transitionName = "if_" + ctx.start.getLine();
+
+            this.conditionalExpressions.push(conditionalExpression);
             this.oldPrevious.push(new HashSet<>(this.current.last));
-
-            String transitionName = "if_" + ctx.start.getLine();
-            String placeName = this.current.nextPlaceName();
-
-
-            this.current.lpn.addTransition(transitionName);
-            this.current.lpn.addPlace(placeName, false);
-            this.current.lpn.addMovement(transitionName, placeName);
-
-            for(String prev : this.current.last) {
-                this.current.lpn.addMovement(prev, transitionName);
-            }
-
-            this.current.last.clear();
-            this.current.last.add(placeName);
+        } else {
+            // Handle else case
+            conditionalExpression = "~(" + this.conditionalExpressions.pop() + ")";
+            placeName = this.current.nextPlaceName();
+            transitionName = "else_" + ctx.start.getLine();
+            this.oldPrevious.push(new HashSet<>(this.current.last));
         }
+
+        this.current.lpn.addTransition(transitionName);
+        this.current.lpn.addPlace(placeName, false);
+        this.current.lpn.addMovement(transitionName, placeName);
+        this.current.lpn.addEnabling(transitionName, conditionalExpression);
+
+        for (String prev : this.oldPrevious.peek()) {
+            this.current.lpn.addMovement(prev, transitionName);
+        }
+
+        this.current.last.clear();
+        this.current.last.add(placeName);
+    }
+
+    @Override
+    public void exitStatement_or_null(Statement_or_nullContext ctx) {
+        if(this.conditionalPost.empty())
+            return;
+
+        if(!(ctx.getParent() instanceof Conditional_statementContext))
+            return;
+
+        String transitionName = this.current.nextTransitionName();
+
+        this.current.lpn.addTransition(transitionName);
+
+        for(String place : this.current.last) {
+            this.current.lpn.addMovement(place, transitionName);
+            this.current.lpn.addMovement(transitionName, this.conditionalPost.peek());
+        }
+
+        this.current.last = this.oldPrevious.pop();
     }
 
     @Override
