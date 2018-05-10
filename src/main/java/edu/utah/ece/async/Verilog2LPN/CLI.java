@@ -16,5 +16,7 @@ public class CLI {
     	}
     	
     	Compiler compiler = new Compiler(options);
+
+    	compiler.compile("result.lpn");
     }
 }

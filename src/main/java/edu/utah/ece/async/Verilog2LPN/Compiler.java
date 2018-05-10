@@ -16,6 +16,7 @@ import java.util.List;
 public class Compiler {
 	private CompilationOptions options;
 	private List<Module_declarationContext> modules;
+	private Source_textContext stc;
 	private LPN lpn;
 
 	/**
@@ -32,6 +33,12 @@ public class Compiler {
 		}
 	}
 
+	public void compile(String destinationFilename) {
+		VerilogListener vl = new VerilogListener(this.lpn);
+		ParseTreeWalker.DEFAULT.walk(vl, this.stc);
+
+		this.lpn.save(destinationFilename);
+	}
 
 	private void parseFile(File file) {
 		InputStream inputStream;
@@ -47,13 +54,8 @@ public class Compiler {
 			Lexer lexer = new Verilog2001Lexer(CharStreams.fromStream(inputStream));
 			TokenStream tokenStream = new CommonTokenStream(lexer);
 			Verilog2001Parser parser = new Verilog2001Parser(tokenStream);
-			
-			Source_textContext source = parser.source_text();
 
-			VerilogListener vl = new VerilogListener(this.lpn);
-            ParseTreeWalker.DEFAULT.walk(vl, source);
-
-            this.lpn.save("result.lpn");
+			this.stc = parser.source_text();
 
 			inputStream.close();
 		} catch (IOException e) {

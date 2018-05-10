@@ -9,15 +9,19 @@ public class CompilationOptions {
 
 	public CompilationOptions(String[] cmdline) throws CompilationOptionsException {
 		this.files = new ArrayList<>();
-		
+
 		for(String argument : cmdline) {
 			// For now, assume all arguments are files
 			File fileArgument = new File(argument);
 			addFile(fileArgument);
 		}
 	}
+
+	public CompilationOptions() {
+		this.files = new ArrayList<>();
+	}
 	
-	private void addFile(File file) throws CompilationOptionsException {
+	public void addFile(File file) throws CompilationOptionsException {
 		if(!file.exists()) {
 			throw new CompilationOptionsException();
 		}
@@ -31,7 +35,7 @@ public class CompilationOptions {
 		}
 	}
 	
-	private void addDirectory(File directory) throws CompilationOptionsException {
+	public void addDirectory(File directory) throws CompilationOptionsException {
 		for(File file : directory.listFiles()) {
 			addFile(file);
 		}
