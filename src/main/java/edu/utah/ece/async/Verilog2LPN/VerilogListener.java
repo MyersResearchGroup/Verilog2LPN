@@ -128,8 +128,8 @@ public class VerilogListener extends Verilog2001BaseListener {
         for(int i = 0; i < branches; i++) {
             String transitionName = this.current.nextTransitionName();
             this.current.addTransition(transitionName);
-            this.current.lpn.addIntAssign(transitionName, lvalue, Integer.toString(i));
-
+            this.current.lpn.addBoolAssign(transitionName, lvalue, Integer.toString(i));
+	    
             for(String prev : this.current.last) {
                 this.current.lpn.addMovement(prev, transitionName);
             }
@@ -173,7 +173,8 @@ public class VerilogListener extends Verilog2001BaseListener {
 
         this.current.last.clear();
         this.current.last.add(postPlaceName);
-        this.current.lpn.addBoolAssign(transitionName, lvalue, getExpression());
+        String expression = getExpression();
+        this.current.lpn.addBoolAssign(transitionName, lvalue, expression);
     }
 
     @Override
@@ -205,7 +206,8 @@ public class VerilogListener extends Verilog2001BaseListener {
 
         this.current.last.clear();
         this.current.last.add(postPlaceName);
-        this.current.lpn.addBoolAssign(transitionName, lvalue, getExpression());
+        String expression = getExpression();
+        this.current.lpn.addBoolAssign(transitionName, lvalue, expression);
     }
 
     @Override
